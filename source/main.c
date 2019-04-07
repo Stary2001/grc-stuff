@@ -110,9 +110,6 @@ typedef struct ContinuousRecorder
     Service s;
 } ContinuousRecorder;
 
-
-// 0xcad4 = your tmem is too small
-
 Result grcGetIContinuousRecorder(ContinuousRecorder* out)
 {
     IpcCommand c;
@@ -124,19 +121,17 @@ Result grcGetIContinuousRecorder(ContinuousRecorder* out)
     struct {
         u64 magic;
         u64 cmd_id;
-        
-        // data blob start
-        u64 unk_1; // 0
-        char padding[8]; // 8
-        u32 unk_2; // 16
-        u32 unk_3; // 20
-        u32 unk_4; // 24
-        u16 unk_5; // 28
-        char fps;
-        char unk_6; // 31
-        u64 unk_7; // some size?
 
-        char test[64 - 8 - 8 - 4 - 4 - 4 - 2 - 1 - 1 - 8];
+        u64 application_id; // 0
+        u64 ar_uid;
+        u32 unk_10; // bitrate? default 8000000
+        u32 unk_14; // default 20000
+        u32 unk_18; // default 1000
+        u16 unk_1C; // fps-related? default 30
+        u8 fps;
+        u8 unk_1F; // unk, default 0
+        u64 size_of_some_buffer; // default 0, but this gets set by other code
+        char padding[64 - 8 - 8 - 4 - 4 - 4 - 2 - 1 - 1 - 8];
         u64 your_transfer_memory_size;
     } PACKED *raw;
 
@@ -144,16 +139,19 @@ Result grcGetIContinuousRecorder(ContinuousRecorder* out)
 
     if(R_SUCCEEDED(rc))
     {
+        memset(raw, 0, sizeof(*raw));
         raw->magic = SFCI_MAGIC;
         raw->cmd_id = 1;
-        raw->fps = 60;
-        raw->unk_1 = 0; // idk
-        raw->unk_2 = 0; // idk
-        raw->unk_3 = 1; // some time
-        raw->unk_4 = 1; // some time
-        raw->unk_5 = 0; // idk - changing this changes frame size
-        raw->unk_6 = 0; // some flag
-        raw->unk_7 = 0; // some size
+        
+        raw->application_id = 0;
+        raw->ar_uid = 0;
+        raw->unk_10 = 8000000; // Probably bitrate?
+        raw->unk_14 = 20000;
+        raw->unk_18 = 0;
+        raw->unk_1C = 30;
+        raw->fps = 30;
+        raw->unk_1F = 0;
+        raw->size_of_some_buffer = 8*1024*1024;
 
         raw->your_transfer_memory_size = grc_transfermem_size;
 
@@ -236,13 +234,13 @@ int main(int argc, char* argv[])
     }
 
     // Call this once, ever!
-    /*rc = grcdCmd1();
+    rc = grcdCmd1();
     if(R_FAILED(rc))
     {
         printf("grcdCmd1 %08x\n", rc);
-    }*/
+    }
 
-    unsigned int buff_size = 0x100000;
+    unsigned int buff_size = 0x32000;
     char *buff = malloc(buff_size);
 
     FILE *cap_file = fopen("test_capture.h264", "wb");
